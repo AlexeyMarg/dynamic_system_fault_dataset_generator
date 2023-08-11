@@ -1100,19 +1100,10 @@ class app_window(QWidget):
                     headers.append('fault_y'+str(i+1))
                 headers.append('comp_fault')
                            
-                file_name = 'experiment' + str(N_experiment) + '.csv'
-                
+                file_name = folder + '/experiment' + str(N_experiment) + '.csv'
+                                
                 pd.DataFrame(dataset, columns=headers).to_csv(file_name)
                 
-                
-                
-                
-                '''        
-                for row in range(len(y_history)):
-                    plt.plot(time, y_history[row, :])
-                plt.show()                            
-                '''
-
   
     def model_func(self, x, t, time, fault_status_history,  fault_type, u_history):
         if fault_type != 'Component':
