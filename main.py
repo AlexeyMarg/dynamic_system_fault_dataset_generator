@@ -1037,8 +1037,10 @@ class app_window(QWidget):
                         fault_status_history[step] = 1
                 state_history = odeint(self.model_func, x0.ravel(), time, args=(time, fault_status_history, fault_type, u_history)).reshape(2, -1)
                 
+                
                 # output precalculation
                 y_history = np.zeros((len(self.C), len(time)))
+                y_nominal = np.zeros((len(self.C), len(time)))
                 y_faults_history = np.zeros((len(self.C), len(time)))
                 comp_faults_history = np.zeros((1, len(time)))
                 for step in range(len(time)):
@@ -1048,6 +1050,8 @@ class app_window(QWidget):
                     for row, data in enumerate(self.noise):
                         xi[row, 0] = np.random.normal(loc=data[0], scale=data[1])
                     y_history[:, step] = (np.matmul(self.C, x) + np.matmul(self.D, u) + xi).ravel()
+                    y_nominal[:, step] = np.matmul(self.C, x).ravel()
+                    #print('Nominal shape: ', y_nominal.shape)
                 # output faults
                 if fault_type == 'Output':
                     if fault_form == 'Stuck':
@@ -1086,14 +1090,17 @@ class app_window(QWidget):
                     comp_faults_history[0, step_start:step_stop] = 1
                                 
                 
-                u_cols, y_cols, u_f_cols, y_f_cols, comp_cols  = u_history.T, y_history.T, u_faults_history.T, y_faults_history.T, comp_faults_history.T
-                dataset = np.c_[u_cols, y_cols, u_f_cols, y_f_cols, comp_cols]
+                u_cols, y_cols, y_nom_cols, u_f_cols, y_f_cols, comp_cols  = \
+                    u_history.T, y_history.T, y_nominal.T, u_faults_history.T, y_faults_history.T, comp_faults_history.T
+                dataset = np.c_[u_cols, y_cols, y_nom_cols, u_f_cols, y_f_cols, comp_cols]
                 
                 headers = []
                 for i in range(len(self.B[0])):
                     headers.append('u'+str(i+1))
                 for i in range(len(self.C)):
                     headers.append('y'+str(i+1))
+                for i in range(len(self.C)):
+                    headers.append('y_nominal'+str(i+1))    
                 for i in range(len(self.B[0])):
                     headers.append('fault_u'+str(i+1))
                 for i in range(len(self.C)):
