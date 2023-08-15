@@ -279,9 +279,15 @@ class app_window(QWidget):
         if u_type == 'Constant':
             try:
                 u_params = self.str_to_matrix(self.control_const_value_le.text())
-                if (len(u_params) != len(self.B[0])) or (len(u_params[0]) != 1):
-                    self.raise_error_message('Input is incompatible with B')
+                if (len(u_params) != len(self.B[0])):
                     flag = False
+                    self.raise_error_message('Input is incompatible with B')
+                for param in u_params:
+                    min_input = float(param[0])
+                    max_input = float(param[1])
+                    if len(param) !=2 or (min_input > max_input):
+                        flag = False
+                        self.raise_error_message('Input is incompatible with B')                    
             except:
                 self.raise_error_message('Wrong input value')
                 flag = False 
@@ -602,21 +608,21 @@ class app_window(QWidget):
         self.control_type_combo.currentIndexChanged.connect(self.combo_change_control_type)
         self.control_grid.addWidget(self.control_type_combo, 0, 1, alignment=Qt.AlignLeft)
         
-        self.control_const_value_lbl = QLabel('Value')
+        self.control_const_value_lbl = QLabel('[[min, max], ...]')
         self.control_const_value_lbl.resize(self.control_const_value_lbl.sizeHint())
         self.control_grid.addWidget(self.control_const_value_lbl, 0, 2, alignment=Qt.AlignRight)
         
-        self.control_const_value_le = QLineEdit('[[1], [0.5]]')
-        self.control_const_value_le.setFixedWidth(100)
+        self.control_const_value_le = QLineEdit('[[-0.5, 0.5], [0, 0]]')
+        self.control_const_value_le.setFixedWidth(150)
         self.control_grid.addWidget(self.control_const_value_le, 0, 3, alignment=Qt.AlignLeft)
         
-        self.control_sin_value_lbl = QLabel('[[Amp, w, phase]]]')
+        self.control_sin_value_lbl = QLabel('[[max_amp, max_w, max_phase], ...]')
         self.control_sin_value_lbl.resize(self.control_sin_value_lbl.sizeHint())
         self.control_sin_value_lbl.setVisible(False)
         self.control_grid.addWidget(self.control_sin_value_lbl, 0, 2, alignment=Qt.AlignRight)
         
-        self.control_sin_value_le = QLineEdit('[[1, 10, 0], [0.5, 1, 0.1]]')
-        self.control_sin_value_le.setFixedWidth(100)
+        self.control_sin_value_le = QLineEdit('[[20, 10, 6], [0, 0, 0]]')
+        self.control_sin_value_le.setFixedWidth(150)
         self.control_sin_value_le.setVisible(False)
         self.control_grid.addWidget(self.control_sin_value_le, 0, 3, alignment=Qt.AlignLeft)
     
@@ -980,11 +986,11 @@ class app_window(QWidget):
 
             for j in range(fault_N):
                 N_experiment += 1
-                
+                '''
                 u_f = np.zeros((len(self.B[0]), len(time)))
                 y_f = np.zeros((len(self.C), len(time)))
                 c_f = np.zeros((1, len(time)))
-                
+                '''
                 x0 = []
                 for i in range(len(self.x0_min)):
                     x0.append([uniform(self.x0_min[i][0], self.x0_max[i][0])])
@@ -992,14 +998,30 @@ class app_window(QWidget):
                 
                 fault_start = uniform(fault_min_start, fault_max_start)
                 fault_stop = fault_start + uniform(fault_min_duration, fault_max_duration)
-                
+                '''
                 self.u = []
                 for input in u_params:
                     self.u.append([])
+                '''
                 
                 # u precalculation
                 u_history = np.zeros((len(self.B[0]), len(time)))
                 u_faults_history = np.zeros((len(self.B[0]), len(time)))
+                
+                if u_type == 'Constant':
+                    u_value = np.zeros((len(self.B[0]), 1))
+                    for i, param in enumerate(u_params):
+                        u_value[i] = np.random.uniform(param[0], param[1])
+                    u_params = u_value
+                else:
+                    u_value = np.zeros((len(self.B[0]), 3))
+                    for i, param in enumerate(u_params):
+                        u_value[i][0] = np.random.uniform(0, param[0])
+                        u_value[i][1] = np.random.uniform(0, param[1])
+                        u_value[i][2] = np.random.uniform(0, param[2])
+                    u_params = u_value
+                        
+                
                 
                 # input faults
                 for step in range(len(time)):
