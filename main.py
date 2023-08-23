@@ -955,6 +955,7 @@ class app_window(QWidget):
                 fault_params = eval(fault_params)
             u_type = self.table_tbl.item(i, 8).text()
             u_params = np.array(self.str_to_matrix(self.table_tbl.item(i, 9).text()))
+            u_params2 = u_params.copy()
             
             if fault_type == 'Component':
                 dA_min = fault_params['dA']['min']
@@ -985,6 +986,7 @@ class app_window(QWidget):
                         
 
             for j in range(fault_N):
+                u_params = u_params2.copy()
                 N_experiment += 1
                 '''
                 u_f = np.zeros((len(self.B[0]), len(time)))
@@ -1011,7 +1013,7 @@ class app_window(QWidget):
                 if u_type == 'Constant':
                     u_value = np.zeros((len(self.B[0]), 1))
                     for i, param in enumerate(u_params):
-                        u_value[i] = np.random.uniform(param[0], param[1])
+                        u_value[i][0] = np.random.uniform(param[0], param[1])
                     u_params = u_value
                 else:
                     u_value = np.zeros((len(self.B[0]), 3))
