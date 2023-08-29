@@ -404,6 +404,9 @@ class app_window(QWidget):
         self.initial_conditions_max_le.setAlignment(Qt.AlignTop)
         self.plant_grid.addWidget(self.initial_conditions_max_le, 4, 3, alignment=Qt.AlignLeft)
         
+        self.discrete_ckb = QCheckBox('Discrete plant')
+        self.plant_grid.addWidget(self.discrete_ckb, 0, 4, alignment=Qt.AlignLeft)
+        
         self.set_edit_plant_btn = QPushButton('Set', self)
         self.set_edit_plant_btn.setFixedWidth(50)
         self.set_edit_plant_btn.clicked.connect(self.clicked_parse_plant)
@@ -860,6 +863,7 @@ class app_window(QWidget):
                 self.noise_le.setEnabled(False)
                 self.modeling_time_le.setEnabled(False)
                 self.sampling_time_le.setEnabled(False)
+                self.discrete_ckb.setEnabled(False)
                 self.add_to_plan_btn.setEnabled(True)
                   
                 
@@ -875,6 +879,7 @@ class app_window(QWidget):
             self.noise_le.setEnabled(True)
             self.modeling_time_le.setEnabled(True)
             self.sampling_time_le.setEnabled(True)
+            self.discrete_ckb.setEnabled(True)
             self.add_to_plan_btn.setEnabled(False)
             self.clear_table()
             
@@ -988,11 +993,7 @@ class app_window(QWidget):
             for j in range(fault_N):
                 u_params = u_params2.copy()
                 N_experiment += 1
-                '''
-                u_f = np.zeros((len(self.B[0]), len(time)))
-                y_f = np.zeros((len(self.C), len(time)))
-                c_f = np.zeros((1, len(time)))
-                '''
+
                 x0 = []
                 for i in range(len(self.x0_min)):
                     x0.append([uniform(self.x0_min[i][0], self.x0_max[i][0])])
@@ -1000,11 +1001,7 @@ class app_window(QWidget):
                 
                 fault_start = uniform(fault_min_start, fault_max_start)
                 fault_stop = fault_start + uniform(fault_min_duration, fault_max_duration)
-                '''
-                self.u = []
-                for input in u_params:
-                    self.u.append([])
-                '''
+
                 
                 # u precalculation
                 u_history = np.zeros((len(self.B[0]), len(time)))
@@ -1059,7 +1056,13 @@ class app_window(QWidget):
                 for step, t in enumerate(time):
                     if fault_start<t<fault_stop:
                         fault_status_history[step] = 1
-                state_history = odeint(self.model_func, x0.ravel(), time, args=(time, fault_status_history, fault_type, u_history)).reshape(2, -1)
+                
+                if self.discrete_ckb.isChecked() == False:
+                    state_history = odeint(self.model_func, x0.ravel(), time, args=(time, fault_status_history, fault_type, u_history))
+                    print('\n\n\n Shape ', state_history.shape)
+                    state_history = state_history.reshape(state_history.shape[1], -1)
+                else:
+                    state_history = self.calc_discrete_state_history(x0, time, fault_start, fault_stop, fault_type, u_history)
                 
                 
                 # output precalculation
@@ -1136,6 +1139,27 @@ class app_window(QWidget):
                 pd.DataFrame(dataset, columns=headers).to_csv(file_name)
                 
   
+    def calc_discrete_state_history(self, x0, time, fault_start, fault_stop, fault_type, u_history):
+        state_history = np.zeros((len(x0), len(time)))
+        x = x0
+        state_history[:, 0] = x.ravel()
+        if fault_type != 'Component':
+            for step in range(u_history.shape[1]):
+                u_row = u_history[:, step].ravel()
+                x = np.matmul(self.A, x.reshape(-1, 1)) + np.matmul(self.B, u_row).reshape(-1, 1)
+                state_history[:, step] = x.ravel()
+        else:
+            for step in range(u_history.shape[1]):
+                u_row = u_history[:, step].ravel()
+                if fault_start<time[step]<fault_stop:
+                    fault_status = 1
+                else:
+                    fault_status = 0
+                x = np.matmul(self.A + fault_status * self.dA, x.reshape(-1, 1)) + np.matmul(self.B + fault_status * self.dB, u_row).reshape(-1, 1)
+                state_history[:, step] = x.ravel()
+        return state_history
+        
+    
     def model_func(self, x, t, time, fault_status_history,  fault_type, u_history):
         if fault_type != 'Component':
             u = np.zeros((len(u_history), 1))
