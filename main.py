@@ -938,15 +938,18 @@ class app_window(QWidget):
             
         return True
         
-
-
+    def get_matrix_from_minmax(self, m_min, m_max):
+        m = np.empty_like(m_min, dtype=np.float32)
+        for row in range(len(m_min)):
+            for col in range(len(m_min[0])):
+                m[row, col] = np.random.uniform(float(m_min[row][col]), float(m_max[row][col]))
+        return m
+    
+    
     def clicked_generate(self):
         folder = str(QFileDialog.getExistingDirectory(self, "Select Directory"))
-        N_experiment = 0
-        
-        
-        time = np.arange(0, self.modeling_time, self.sampling_time)
-            
+       
+        time_array = np.arange(0, self.modeling_time, self.sampling_time)
          
         for i in range(self.table_tbl.rowCount()):
             fault_type = self.table_tbl.item(i, 0).text()
@@ -961,117 +964,94 @@ class app_window(QWidget):
                 fault_params = eval(fault_params)
             u_type = self.table_tbl.item(i, 8).text()
             u_params = np.array(self.str_to_matrix(self.table_tbl.item(i, 9).text()))
-            u_params2 = u_params.copy()
-            
+
             if fault_type == 'Component':
                 dA_min = fault_params['dA']['min']
                 dA_max = fault_params['dA']['max']
-                self.dA = np.zeros((len(self.A), len(self.A[0])))
-                for row in range(len(self.A)):
-                    for col in range(len(self.A[0])):
-                        self.dA[row, col] = uniform(float(dA_min[row][col]), float(dA_max[row][col]))
+                self.dA = self.get_matrix_from_minmax(dA_min, dA_max)
                 dB_min = fault_params['dB']['min']
                 dB_max = fault_params['dB']['max']
-                self.dB = np.zeros((len(self.B), len(self.B[0])))
-                for row in range(len(self.B)):
-                    for col in range(len(self.B[0])):
-                        self.dB[row, col] = uniform(float(dB_min[row][col]), float(dB_max[row][col]))
+                self.dB = self.get_matrix_from_minmax(dB_min, dB_max)
                 dC_min = fault_params['dC']['min']
                 dC_max = fault_params['dC']['max']
-                self.dC = np.zeros((len(self.C), len(self.C[0])))
-                for row in range(len(self.C)):
-                    for col in range(len(self.C[0])):
-                        self.dC[row, col] = uniform(float(dC_min[row][col]), float(dC_max[row][col]))
+                self.dC = self.get_matrix_from_minmax(dC_min, dC_max)
                 dD_min = fault_params['dD']['min']
                 dD_max = fault_params['dD']['max']
-                self.dD = np.zeros((len(self.D), len(self.D[0])))
-                for row in range(len(self.D)):
-                    for col in range(len(self.D[0])):
-                        self.dD[row, col] = uniform(float(dD_min[row][col]), float(dD_max[row][col]))
-                        
-                        
+                self.dD = self.get_matrix_from_minmax(dD_min, dD_max)                        
 
-            for j in range(fault_N):
-                u_params = u_params2.copy()
-                N_experiment += 1
-
-                x0 = []
-                for i in range(len(self.x0_min)):
-                    x0.append([uniform(self.x0_min[i][0], self.x0_max[i][0])])
-                x0 = np.array(x0)
-                
+            for N_experiment in range(fault_N):
+                x0 = self.get_matrix_from_minmax(self.x0_min, self.x0_max)
+                                
                 fault_start = uniform(fault_min_start, fault_max_start)
                 fault_stop = fault_start + uniform(fault_min_duration, fault_max_duration)
 
-                
                 # u precalculation
-                u_history = np.zeros((len(self.B[0]), len(time)))
-                u_faults_history = np.zeros((len(self.B[0]), len(time)))
+                u_history = np.zeros((len(self.B[0]), time_array.shape[0]))
+                u_faults_history = np.zeros((len(self.B[0]), time_array.shape[0]))
                 
                 if u_type == 'Constant':
-                    u_value = np.zeros((len(self.B[0]), 1))
+                    u_params_temp = np.empty((len(self.B[0]), 1), dtype=np.float32)
                     for i, param in enumerate(u_params):
-                        u_value[i][0] = np.random.uniform(param[0], param[1])
-                    u_params = u_value
-                else:
-                    u_value = np.zeros((len(self.B[0]), 3))
+                        u_params_temp[i, 0] = np.random.uniform(param[0], param[1])
+                    for step in range(len(time_array)):
+                        u_history[:, step] = u_params_temp.ravel()
+                else: # sin wave
+                    u_params_temp = np.empty((len(self.B[0]), 3), dtype=np.float32)
                     for i, param in enumerate(u_params):
-                        u_value[i][0] = np.random.uniform(0, param[0])
-                        u_value[i][1] = np.random.uniform(0, param[1])
-                        u_value[i][2] = np.random.uniform(0, param[2])
-                    u_params = u_value
-                        
-                
+                        u_params_temp[i][0] = np.random.uniform(0, param[0])
+                        u_params_temp[i][1] = np.random.uniform(0, param[1])
+                        u_params_temp[i][2] = np.random.uniform(0, param[2])
+                    for step in range(len(time_array)):     
+                        u_history[:, step] = (u_params_temp[:, 0] * np.sin(u_params_temp[:, 1]*time_array[step] + u_params_temp[:, 2])).ravel()                
                 
                 # input faults
-                for step in range(len(time)):
-                    if u_type == 'Constant':
-                        u_history[:, step] = u_params.ravel()
-                    else:
-                        u_history[:, step] = (u_params[:, 0] * np.sin(u_params[:, 1]*time[step] + u_params[:, 2])).ravel()
-                    
                 if fault_type == 'Input':
                     if fault_form == 'Stuck':
                         if u_type == 'Sin wave':
                             N_input = fault_params - 1
-                            u_stuck = u_params[N_input, 0] * np.sin(u_params[N_input, 1]*fault_start + u_params[N_input, 2])
-                            for step, t in enumerate(time):
+                            u_stuck = u_params_temp[N_input, 0] * np.sin(u_params_temp[N_input, 1]*fault_start + u_params_temp[N_input, 2])
+                            for step, t in enumerate(time_array):
                                 if fault_start<t<fault_stop:
                                     u_history[N_input, step] = u_stuck.ravel()
                                     u_faults_history[N_input, step] = 1
                     elif fault_form == 'Multiplicative':
                         N_input, value = fault_params[0] - 1, uniform(fault_params[1], fault_params[2]) 
-                        for step, t in enumerate(time):
+                        for step, t in enumerate(time_array):
                                 if fault_start<t<fault_stop:
                                     u_history[N_input, step] = value* float(u_history[N_input, step])
                                     u_faults_history[N_input, step] = 2
                     else: #constant
                        N_input, value = fault_params[0] - 1, uniform(fault_params[1], fault_params[2]) 
-                       for step, t in enumerate(time):
+                       for step, t in enumerate(time_array):
                                 if fault_start<t<fault_stop:
                                     u_history[N_input, step] = value
                                     u_faults_history[N_input, step] = 3                                     
 
                 # state history calculation
-                fault_status_history = np.zeros(time.shape)
-                for step, t in enumerate(time):
-                    if fault_start<t<fault_stop:
-                        fault_status_history[step] = 1
+                fault_status_history = np.zeros(time_array.shape)
+                if fault_type != 'None':
+                    for step, t in enumerate(time_array):
+                        if fault_start<t<fault_stop:
+                            fault_status_history[step] = 1
                 
                 if self.discrete_ckb.isChecked() == False:
-                    state_history = odeint(self.model_func, x0.ravel(), time, args=(time, fault_status_history, fault_type, u_history))
-                    print('\n\n\n Shape ', state_history.shape)
-                    state_history = state_history.reshape(state_history.shape[1], -1)
+                    state_history = odeint(self.model_func, x0.ravel(), time_array, args=(time_array, fault_status_history, fault_type, u_history))
+                    #plt.plot(time_array, state_history[:, 0])
+                    #plt.plot(time_array, state_history[:, 1])
+                    #plt.show()
+                    print(state_history.shape)
+                    state_history = state_history.T
+
                 else:
-                    state_history = self.calc_discrete_state_history(x0, time, fault_start, fault_stop, fault_type, u_history)
+                    state_history = self.calc_discrete_state_history(x0, time_array, fault_start, fault_stop, fault_type, u_history)
                 
                 
                 # output precalculation
-                y_history = np.zeros((len(self.C), len(time)))
-                y_nominal = np.zeros((len(self.C), len(time)))
-                y_faults_history = np.zeros((len(self.C), len(time)))
-                comp_faults_history = np.zeros((1, len(time)))
-                for step in range(len(time)):
+                y_history = np.zeros((len(self.C), len(time_array)))
+                y_nominal = np.zeros((len(self.C), len(time_array)))
+                y_faults_history = np.zeros((len(self.C), len(time_array)))
+                comp_faults_history = np.zeros((1, len(time_array)))
+                for step in range(len(time_array)):
                     x = state_history[:, step].reshape(-1, 1)
                     u = u_history[:, step].reshape(-1, 1)
                     xi = np.zeros((len(self.C), 1))
@@ -1079,7 +1059,9 @@ class app_window(QWidget):
                         xi[row, 0] = np.random.normal(loc=data[0], scale=data[1])
                     y_history[:, step] = (np.matmul(self.C, x) + np.matmul(self.D, u) + xi).ravel()
                     y_nominal[:, step] = np.matmul(self.C, x).ravel()
-                    #print('Nominal shape: ', y_nominal.shape)
+                #plt.plot(time_array, y_nominal[0, :])
+                #plt.plot(time_array, y_nominal[1, :])
+                #plt.show()
                 # output faults
                 if fault_type == 'Output':
                     if fault_form == 'Stuck':
@@ -1087,21 +1069,21 @@ class app_window(QWidget):
                         step_start = int(fault_start // self.sampling_time)
                         step_stop = int(fault_stop // self.sampling_time)
                         y_stuck = y_history[N_output, step_start]
-                        for step, t in enumerate(time):
+                        for step, t in enumerate(time_array):
                             if fault_start<t<fault_stop:
                                 y_history[N_output, step] = y_stuck
                                 y_faults_history[N_output, step] = 1
                     elif fault_form == 'Multiplicative':
                         N_output = int(fault_params[0]) - 1
                         value = uniform(fault_params[1], fault_params[2])
-                        for step, t in enumerate(time):
+                        for step, t in enumerate(time_array):
                             if fault_start<t<fault_stop:
                                 y_history[N_output, step] = value * y_history[N_output, step]
                                 y_faults_history[N_output, step] = 2
                     else: #constant
                         N_output = int(fault_params[0]) - 1
                         value = uniform(fault_params[1], fault_params[2])
-                        for step, t in enumerate(time):
+                        for step, t in enumerate(time_array):
                             if fault_start<t<fault_stop:
                                 y_history[N_output, step] = value
                                 y_faults_history[N_output, step] = 3
@@ -1110,7 +1092,7 @@ class app_window(QWidget):
                 if fault_type == 'Component':
                     step_start = int(fault_start // self.sampling_time)
                     step_stop = int(fault_stop // self.sampling_time)
-                    for step in range(len(time)):
+                    for step in range(len(time_array)):
                         if step_start<step<step_stop:
                             x = state_history[:, step].reshape(-1, 1)
                             u = u_history[:, step].reshape(-1, 1)
@@ -1161,22 +1143,23 @@ class app_window(QWidget):
         return state_history
         
     
-    def model_func(self, x, t, time, fault_status_history,  fault_type, u_history):
+    def model_func(self, x, t, time_array, fault_status_history, fault_type, u_history):
         if fault_type != 'Component':
             u = np.zeros((len(u_history), 1))
             for row in range(len(u_history)):
                 u_row = u_history[row, :].ravel()
-                u_applied = np.interp(t, time, u_row)
+                u_applied = np.interp(t, time_array, u_row)
                 u[row, 0] = u_applied
             dxdt = np.matmul(self.A, x.reshape(-1, 1)) + np.matmul(self.B, u)
         else:
             u = np.zeros((len(u_history), 1))
             for row in range(len(u_history)):
                 u_row = u_history[row, :].ravel()
-                u_applied = np.interp(t, time, u_row)
+                u_applied = np.interp(t, time_array, u_row)
                 u[row, 0] = u_applied
-                fault_status = np.interp(t, time, fault_status_history)
+                fault_status = np.interp(t, time_array, fault_status_history)
             dxdt = np.matmul(self.A + fault_status * self.dA, x.reshape(-1, 1)) + np.matmul(self.B + fault_status * self.dB, u)
+          
         return dxdt.ravel()
         
 
