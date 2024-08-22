@@ -948,6 +948,7 @@ class app_window(QWidget):
     
     def clicked_generate(self):
         folder = str(QFileDialog.getExistingDirectory(self, "Select Directory"))
+        N_experiment = 0
        
         time_array = np.arange(0, self.modeling_time, self.sampling_time)
          
@@ -979,7 +980,8 @@ class app_window(QWidget):
                 dD_max = fault_params['dD']['max']
                 self.dD = self.get_matrix_from_minmax(dD_min, dD_max)                        
 
-            for N_experiment in range(fault_N):
+            for _ in range(fault_N):
+                N_experiment += 1
                 x0 = self.get_matrix_from_minmax(self.x0_min, self.x0_max)
                                 
                 fault_start = uniform(fault_min_start, fault_max_start)
