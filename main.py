@@ -335,6 +335,7 @@ class app_window(QWidget):
 
     
     def str_to_matrix(self, s):
+        s = s.replace('\n', '')
         s= s.replace(' ', '')
         s = s.split('],[')
         m = []
@@ -344,7 +345,7 @@ class app_window(QWidget):
             temp2 = []
             for j in range(len(temp)):
                 temp2.append(float(temp[j]))
-            m.append(temp2)                
+            m.append(temp2)   
         return m
         
                
